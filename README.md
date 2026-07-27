@@ -1,16 +1,3 @@
----
-title: Te educo a palos
-emoji: 🪵
-colorFrom: green
-colorTo: gray
-sdk: gradio
-sdk_version: 6.20.0
-app_file: app.py
-pinned: false
-license: mit
-short_description: Agente de IA que corrige pruebas y genera variantes de ellas
----
-
 # 🪵 Te educo a palos
 
 Agente de inteligencia artificial que lee una evaluación escolar, en PDF o como
@@ -147,13 +134,17 @@ que informa el proveedor.
 | Lectura de PDF | PyMuPDF (renderizado) y pypdf |
 | Procesamiento de imágenes | Pillow |
 | Validación de salida | Pydantic |
-| Interfaz web | Gradio |
+| Interfaz web | Streamlit (nube) y Gradio (local) |
 | Generación de PDF | ReportLab |
-| Despliegue | Hugging Face Spaces |
+| Despliegue | Streamlit Community Cloud |
 
 El proyecto funciona con **dos proveedores de modelos** sin cambios en el
 código. Si existe `GOOGLE_API_KEY` usa Gemini; si existe `OPENAI_API_KEY` usa
 GPT. La variable `PROVEEDOR` permite forzar uno de los dos.
+
+También expone **dos interfaces** sobre el mismo motor. Ambas importan las
+mismas funciones de `src/` y no duplican reglas de negocio: Gradio resulta más
+cómodo para desarrollar en local y Streamlit es lo que se despliega en la nube.
 
 ---
 
@@ -284,11 +275,21 @@ OPENAI_API_KEY=tu_clave_de_openai
 
 ### Ejecución
 
+Con Streamlit, que es la interfaz que se despliega en la nube:
+
+```bash
+streamlit run streamlit_app.py
+```
+
+Queda disponible en `http://localhost:8501`.
+
+Con Gradio, alternativa para desarrollo local:
+
 ```bash
 python app.py
 ```
 
-La aplicación queda disponible en `http://127.0.0.1:7860`.
+Queda disponible en `http://127.0.0.1:7860`.
 
 ### Regenerar las pruebas de ejemplo
 
@@ -321,7 +322,8 @@ bajando el total a unos 30 segundos.
 
 ```
 .
-├── app.py                          Interfaz Gradio y punto de entrada
+├── streamlit_app.py                Interfaz Streamlit, la que se despliega
+├── app.py                          Interfaz Gradio, para desarrollo local
 ├── src/
 │   ├── config.py                   Variables de entorno y elección de proveedor
 │   ├── modelos.py                  Esquemas Pydantic de la salida del modelo
@@ -340,30 +342,47 @@ bajando el total a unos 30 segundos.
 
 ## Despliegue
 
-La aplicación está desplegada en **Hugging Face Spaces**, que ofrece alojamiento
-gratuito con URL pública permanente y no requiere tarjeta de crédito.
+La aplicación está desplegada en **Streamlit Community Cloud**, que ofrece
+alojamiento gratuito con URL pública permanente, se conecta directamente a este
+repositorio y no requiere tarjeta de crédito.
+
+### Por qué no Hugging Face ni OCI
 
 El enunciado del challenge sugiere OCI Compute, pero indica expresamente que las
-tecnologías propuestas son sugerencias y no obligaciones. La aplicación no tiene
-ninguna dependencia del proveedor: se ejecuta con `python app.py` sobre
-cualquier máquina con Python 3.10 o superior, de modo que desplegarla en una
-instancia de OCI Compute consiste en clonar el repositorio, instalar los
-requisitos, definir la variable de entorno con la clave y abrir el puerto 7860.
+tecnologías propuestas son sugerencias y no obligaciones. Se evaluaron tres
+alternativas:
+
+| Plataforma | Resultado |
+|---|---|
+| OCI Compute | El nivel Always Free exige tarjeta de crédito para verificar identidad |
+| Hugging Face Spaces | Desde 2026 solo los Spaces estáticos son gratuitos. Gradio y Docker requieren suscripción PRO |
+| Streamlit Community Cloud | Gratuito, sin tarjeta, con URL pública permanente |
+
+La aplicación no tiene ninguna dependencia de la plataforma: se ejecuta con
+`streamlit run streamlit_app.py` sobre cualquier máquina con Python 3.10 o
+superior. Desplegarla en una instancia de OCI Compute consiste en clonar el
+repositorio, instalar los requisitos, definir la variable de entorno con la
+clave y abrir el puerto correspondiente.
 
 ### Pasos para replicar el despliegue
 
-1. Crear un Space en [huggingface.co/new-space](https://huggingface.co/new-space)
-   con SDK **Gradio**.
-2. En *Settings → Variables and secrets*, agregar el secreto `GOOGLE_API_KEY`
-   (o `OPENAI_API_KEY`).
-3. Subir el repositorio al Space:
+1. Entrar a [share.streamlit.io](https://share.streamlit.io) e iniciar sesión
+   con la cuenta de GitHub.
+2. Elegir **Create app** y luego **Deploy a public app from GitHub**.
+3. Completar el formulario:
+   - Repository: `3betclover/DesafioAlura`
+   - Branch: `main`
+   - Main file path: `streamlit_app.py`
+4. En **Advanced settings → Secrets**, pegar la clave en formato TOML:
 
-   ```bash
-   git remote add space https://huggingface.co/spaces/USUARIO/te-educo-a-palos
-   git push space main
+   ```toml
+   GOOGLE_API_KEY = "tu_clave_de_google"
    ```
 
-El Space instala `requirements.txt` y levanta `app.py` automáticamente.
+5. Presionar **Deploy**.
+
+Streamlit instala `requirements.txt` y levanta la aplicación. Cada `git push` a
+`main` la redespliega automáticamente.
 
 ---
 

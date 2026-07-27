@@ -1,9 +1,11 @@
-gradio>=5.0
-langchain-core>=0.3
+streamlit>=1.40
+gradio>=6.0
+langchain-core>=1.0
 langchain-google-genai>=2.0
 langchain-openai>=0.3
 pydantic>=2.7
 pypdf>=5.0
 pymupdf>=1.24
+pillow>=10.0
 reportlab>=4.2
 python-dotenv>=1.0
