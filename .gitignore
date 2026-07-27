@@ -1,0 +1,29 @@
+# Variables de entorno y credenciales
+.env
+*.key
+
+# Índice vectorial generado (se reconstruye automáticamente)
+indice_faiss/
+
+# Entornos virtuales
+.venv/
+venv/
+env/
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+
+# Gradio
+.gradio/
+flagged/
+
+# Sistema operativo
+.DS_Store
+Thumbs.db
+
+# Editores
+.vscode/
+.idea/
