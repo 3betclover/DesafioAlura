@@ -13,16 +13,20 @@ siguiente, que es la causa más común de correcciones inconsistentes cuando se
 manda la prueba completa en un solo prompt.
 """
 
+import re
+import time
 from concurrent.futures import ThreadPoolExecutor
 from typing import Optional
 
 from langchain_core.messages import HumanMessage, SystemMessage
+from langchain_core.rate_limiters import InMemoryRateLimiter
 
 from src.config import (
     MAX_HILOS,
     MODELO_RAZONAMIENTO,
     MODELO_VISION,
     PROVEEDOR,
+    RPM,
     clave_activa,
     hay_credenciales,
 )
@@ -32,6 +36,63 @@ from src.modelos import Correccion, Item, ItemConVariantes, Prueba
 
 class FaltaClaveAPI(Exception):
     """No hay una clave de API configurada en el entorno."""
+
+
+class CuotaAgotada(Exception):
+    """El proveedor rechazó las peticiones por límite de cuota."""
+
+
+# Limitador compartido por todas las instancias de modelo. Como las
+# correcciones se lanzan en paralelo, sin él un documento de ocho preguntas
+# dispara ocho peticiones simultáneas y el nivel gratuito las rechaza.
+_LIMITADOR = InMemoryRateLimiter(
+    requests_per_second=RPM / 60,
+    check_every_n_seconds=0.25,
+    max_bucket_size=max(1, RPM // 2),
+)
+
+MAX_REINTENTOS = 3
+ESPERA_POR_DEFECTO = 20.0
+
+
+def _es_error_de_cuota(error: Exception) -> bool:
+    """Reconoce los rechazos por límite de peticiones de ambos proveedores."""
+    texto = str(error)
+    return "429" in texto or "RESOURCE_EXHAUSTED" in texto or "quota" in texto.lower()
+
+
+def _espera_sugerida(error: Exception) -> float:
+    """Extrae de la respuesta del proveedor cuántos segundos conviene esperar."""
+    encontrado = re.search(r"retryDelay['\"]?:\s*['\"]?(\d+(?:\.\d+)?)s", str(error))
+    if encontrado:
+        return min(float(encontrado.group(1)) + 1.0, 65.0)
+    return ESPERA_POR_DEFECTO
+
+
+def _invocar(modelo, mensajes):
+    """Llama al modelo reintentando cuando el rechazo es por cuota.
+
+    El limitador de tasa evita la mayoría de estos casos, pero la ventana de
+    cuota del proveedor es deslizante y no siempre coincide con la nuestra, así
+    que se conserva el reintento como red de seguridad.
+    """
+    ultimo_error: Optional[Exception] = None
+
+    for intento in range(MAX_REINTENTOS):
+        try:
+            return modelo.invoke(mensajes)
+        except Exception as error:  # noqa: BLE001 - se filtra más abajo
+            if not _es_error_de_cuota(error):
+                raise
+            ultimo_error = error
+            if intento < MAX_REINTENTOS - 1:
+                time.sleep(_espera_sugerida(error))
+
+    raise CuotaAgotada(
+        "El proveedor rechazó las peticiones por límite de cuota. El nivel "
+        "gratuito permite pocas consultas por minuto: espera un momento y "
+        "vuelve a intentarlo, o reduce la cantidad de preguntas del documento."
+    ) from ultimo_error
 
 
 def _crear_modelo(nombre: str, esquema, temperatura: float = 0.0):
@@ -47,28 +108,47 @@ def _crear_modelo(nombre: str, esquema, temperatura: float = 0.0):
             "local, o como Secret del Space en Hugging Face."
         )
 
+    opciones = {"timeout": 120, "max_retries": 2, "rate_limiter": _LIMITADOR}
+
+    if _acepta_temperatura(nombre):
+        opciones["temperature"] = temperatura
+
     if PROVEEDOR == "google":
         from langchain_google_genai import ChatGoogleGenerativeAI
 
         modelo = ChatGoogleGenerativeAI(
-            model=nombre,
-            temperature=temperatura,
-            google_api_key=clave_activa(),
-            timeout=120,
-            max_retries=2,
+            model=nombre, google_api_key=clave_activa(), **opciones
         )
     else:
         from langchain_openai import ChatOpenAI
 
-        modelo = ChatOpenAI(
-            model=nombre,
-            temperature=temperatura,
-            api_key=clave_activa(),
-            timeout=120,
-            max_retries=2,
-        )
+        modelo = ChatOpenAI(model=nombre, api_key=clave_activa(), **opciones)
 
     return modelo.with_structured_output(esquema)
+
+
+def _acepta_temperatura(nombre: str) -> bool:
+    """Indica si el modelo permite ajustar la temperatura.
+
+    Gemini 3 en adelante usa parámetros de muestreo fijos y descarta el valor
+    enviado, emitiendo una advertencia en cada llamada. Se omite el parámetro
+    para esos modelos en lugar de ensuciar los registros.
+    """
+    generacion = re.match(r"gemini-(\d+)", nombre)
+    return not (generacion and int(generacion.group(1)) >= 3)
+
+
+def _rellenar(plantilla: str, **valores) -> str:
+    """Sustituye marcadores `<<nombre>>` dentro de una plantilla de prompt.
+
+    No se usa `str.format` ni `string.Template` porque los prompts contienen
+    LaTeX, que ocupa tanto las llaves como el signo de dólar. Un delimitador
+    propio evita tener que escapar cada fórmula del texto.
+    """
+    resultado = plantilla
+    for nombre, valor in valores.items():
+        resultado = resultado.replace(f"<<{nombre}>>", str(valor))
+    return resultado
 
 
 def _bloque_imagen(imagen_b64: str) -> dict:
@@ -144,11 +224,12 @@ def transcribir_prueba(paginas: list[Pagina]) -> Prueba:
             )
 
     modelo = _crear_modelo(MODELO_VISION, Prueba)
-    return modelo.invoke(
+    return _invocar(
+        modelo,
         [
             SystemMessage(content=INSTRUCCION_TRANSCRIPCION),
             HumanMessage(content=contenido),
-        ]
+        ],
     )
 
 
@@ -157,7 +238,7 @@ def transcribir_prueba(paginas: list[Pagina]) -> Prueba:
 # --------------------------------------------------------------------------- #
 
 INSTRUCCION_CORRECCION = """\
-Eres un profesor de {asignatura} que corrige una evaluación de {nivel}.
+Eres un profesor de <<asignatura>> que corrige una evaluación de <<nivel>>.
 
 Sigue este orden de trabajo, sin saltarte ningún paso:
 
@@ -166,8 +247,8 @@ Sigue este orden de trabajo, sin saltarte ningún paso:
    `resolucion_propia` y su resultado en `respuesta_correcta`.
 2. Recién entonces compara tu resultado con lo que respondió el estudiante.
 3. Marca `es_correcta` como true solo si ambas respuestas son equivalentes.
-   Acepta formas distintas de escribir lo mismo: $0{,}5$ y $\\frac{{1}}{{2}}$
-   son la misma respuesta, igual que $2x+1$ y $1+2x$.
+   Acepta formas distintas de escribir lo mismo: $0{,}5$ y $\\frac{1}{2}$ son
+   la misma respuesta, igual que $2x+1$ y $1+2x$.
 
 Sobre la retroalimentación:
 - Escribe en segunda persona, dirigiéndote al estudiante.
@@ -182,7 +263,7 @@ Sobre el puntaje:
 - Otorga crédito parcial cuando el procedimiento es correcto y el error es
   puramente aritmético.
 - Si no hay desarrollo visible y la respuesta es incorrecta, el puntaje es 0.
-- Usa {puntaje} como puntaje total del ítem.
+- Usa <<puntaje>> como puntaje total del ítem.
 """
 
 
@@ -206,18 +287,20 @@ def _describir_item(item: Item) -> str:
 
 def corregir_item(item: Item, asignatura: str, nivel: str) -> Correccion:
     """Corrige un ítem y genera su retroalimentación."""
-    instruccion = INSTRUCCION_CORRECCION.format(
+    instruccion = _rellenar(
+        INSTRUCCION_CORRECCION,
         asignatura=asignatura,
         nivel=nivel,
         puntaje=item.puntaje if item.puntaje else 1.0,
     )
 
     modelo = _crear_modelo(MODELO_RAZONAMIENTO, Correccion)
-    return modelo.invoke(
+    return _invocar(
+        modelo,
         [
             SystemMessage(content=instruccion),
             HumanMessage(content=_describir_item(item)),
-        ]
+        ],
     )
 
 
@@ -244,17 +327,18 @@ def corregir_prueba(prueba: Prueba) -> list[Correccion]:
 # --------------------------------------------------------------------------- #
 
 INSTRUCCION_VARIANTES = """\
-Eres un profesor de {asignatura} que prepara distintas formas de una misma
-evaluación de {nivel}, para que estudiantes sentados juntos no puedan copiarse.
+Eres un profesor de <<asignatura>> que prepara distintas formas de una misma
+evaluación de <<nivel>>, para que estudiantes sentados juntos no puedan
+copiarse.
 
-A partir del ítem original, genera {cantidad} ejercicios nuevos.
+A partir del ítem original, genera <<cantidad>> ejercicios nuevos.
 
 Cada ejercicio debe:
 - Evaluar exactamente la misma habilidad que el original. Identifícala primero
   y déjala escrita en el campo `concepto`.
 - Usar números, nombres y contexto distintos. No basta con reordenar la
   pregunta ni con cambiar un solo dato.
-- Mantener un nivel de dificultad {dificultad}.
+- Mantener un nivel de dificultad <<dificultad>>.
 - Tener solución exacta y verificable. Elige los datos de modo que el resultado
   no quede con decimales interminables, salvo que el original también los tenga.
 - Conservar el formato del original: si era de alternativas, genera cuatro
@@ -275,7 +359,8 @@ def generar_variantes(
     dificultad: str = "equivalente al original",
 ) -> ItemConVariantes:
     """Genera ejercicios equivalentes a partir de un ítem."""
-    instruccion = INSTRUCCION_VARIANTES.format(
+    instruccion = _rellenar(
+        INSTRUCCION_VARIANTES,
         asignatura=asignatura,
         nivel=nivel,
         cantidad=cantidad,
@@ -289,11 +374,12 @@ def generar_variantes(
 
     # Temperatura alta: aquí sí queremos variedad entre las versiones generadas.
     modelo = _crear_modelo(MODELO_RAZONAMIENTO, ItemConVariantes, temperatura=0.8)
-    return modelo.invoke(
+    return _invocar(
+        modelo,
         [
             SystemMessage(content=instruccion),
             HumanMessage(content="\n".join(detalle)),
-        ]
+        ],
     )
 
 

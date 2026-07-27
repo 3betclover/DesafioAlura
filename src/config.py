@@ -26,9 +26,15 @@ PROVEEDORES = ("google", "openai")
 # Modelos por defecto de cada proveedor. Ambos necesitan soportar visión, ya
 # que las pruebas escaneadas y las fotos se procesan como imágenes.
 MODELOS_POR_DEFECTO = {
-    "google": {"vision": "gemini-2.5-flash", "razonamiento": "gemini-2.5-flash"},
+    "google": {"vision": "gemini-3.6-flash", "razonamiento": "gemini-3.6-flash"},
     "openai": {"vision": "gpt-4.1-mini", "razonamiento": "gpt-4.1"},
 }
+
+# Peticiones por minuto permitidas. El nivel gratuito de Google es estrecho
+# (5 por minuto en los modelos Flash de tercera generación), así que el valor
+# por defecto lo respeta. Con una cuenta de pago conviene subirlo mediante la
+# variable de entorno RPM.
+RPM_POR_DEFECTO = {"google": 5, "openai": 60}
 
 
 def _resolver_proveedor() -> str:
@@ -63,6 +69,7 @@ MAX_PAGINAS = int(os.getenv("MAX_PAGINAS", "8"))
 MAX_LADO_IMAGEN = int(os.getenv("MAX_LADO_IMAGEN", "1600"))
 DPI_RENDER_PDF = int(os.getenv("DPI_RENDER_PDF", "180"))
 MAX_HILOS = int(os.getenv("MAX_HILOS", "6"))
+RPM = int(os.getenv("RPM", "") or RPM_POR_DEFECTO[PROVEEDOR])
 
 EJEMPLOS = RAIZ / "ejemplos"
 

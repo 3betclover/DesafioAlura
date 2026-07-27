@@ -15,6 +15,7 @@ from pathlib import Path
 import gradio as gr
 
 from src.agente import (
+    CuotaAgotada,
     FaltaClaveAPI,
     corregir_prueba,
     generar_variantes_prueba,
@@ -62,6 +63,9 @@ def _mensaje_error(error: Exception) -> str:
     """Convierte una excepción en un mensaje comprensible para la interfaz."""
     if isinstance(error, FaltaClaveAPI):
         return AVISO_SIN_CLAVE
+
+    if isinstance(error, CuotaAgotada):
+        return f"### Límite de peticiones alcanzado\n\n{error}"
 
     if isinstance(error, ArchivoNoSoportado):
         return f"### Archivo no soportado\n\n{error}"
