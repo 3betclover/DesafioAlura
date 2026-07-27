@@ -15,8 +15,8 @@ manda la prueba completa en un solo prompt.
 
 import re
 import time
-from concurrent.futures import ThreadPoolExecutor
-from typing import Optional
+from concurrent.futures import ThreadPoolExecutor, as_completed
+from typing import Callable, Optional
 
 from langchain_core.messages import HumanMessage, SystemMessage
 from langchain_core.rate_limiters import InMemoryRateLimiter
@@ -53,6 +53,35 @@ _LIMITADOR = InMemoryRateLimiter(
 
 MAX_REINTENTOS = 3
 ESPERA_POR_DEFECTO = 20.0
+
+# Función que recibe cuántas tareas van completadas y cuántas hay en total.
+# Permite que la interfaz muestre avance real sin que este módulo sepa nada
+# sobre Streamlit ni Gradio.
+Avance = Callable[[int, int], None]
+
+
+def _ejecutar_en_paralelo(tareas: list, trabajo, al_avanzar: Optional[Avance]):
+    """Ejecuta el trabajo sobre cada tarea y avisa a medida que van terminando.
+
+    Devuelve los resultados en el orden original de `tareas`, aunque hayan
+    terminado en otro orden.
+    """
+    resultados: list = [None] * len(tareas)
+
+    with ThreadPoolExecutor(max_workers=MAX_HILOS) as ejecutor:
+        pendientes = {
+            ejecutor.submit(trabajo, tarea): indice
+            for indice, tarea in enumerate(tareas)
+        }
+
+        completadas = 0
+        for futuro in as_completed(pendientes):
+            resultados[pendientes[futuro]] = futuro.result()
+            completadas += 1
+            if al_avanzar:
+                al_avanzar(completadas, len(tareas))
+
+    return resultados
 
 
 def _es_error_de_cuota(error: Exception) -> bool:
@@ -304,8 +333,15 @@ def corregir_item(item: Item, asignatura: str, nivel: str) -> Correccion:
     )
 
 
-def corregir_prueba(prueba: Prueba) -> list[Correccion]:
+def corregir_prueba(
+    prueba: Prueba, al_avanzar: Optional[Avance] = None
+) -> list[Correccion]:
     """Corrige todos los ítems de una prueba en paralelo.
+
+    Args:
+        prueba: Prueba ya transcrita.
+        al_avanzar: Se invoca con (completados, total) cada vez que termina un
+            ítem, para que la interfaz pueda mostrar el avance.
 
     Returns:
         Las correcciones en el mismo orden de los ítems originales.
@@ -313,13 +349,11 @@ def corregir_prueba(prueba: Prueba) -> list[Correccion]:
     if not prueba.items:
         return []
 
-    with ThreadPoolExecutor(max_workers=MAX_HILOS) as ejecutor:
-        return list(
-            ejecutor.map(
-                lambda item: corregir_item(item, prueba.asignatura, prueba.nivel),
-                prueba.items,
-            )
-        )
+    return _ejecutar_en_paralelo(
+        prueba.items,
+        lambda item: corregir_item(item, prueba.asignatura, prueba.nivel),
+        al_avanzar,
+    )
 
 
 # --------------------------------------------------------------------------- #
@@ -388,6 +422,7 @@ def generar_variantes_prueba(
     cantidad: int = 3,
     dificultad: str = "equivalente al original",
     items_elegidos: Optional[list[int]] = None,
+    al_avanzar: Optional[Avance] = None,
 ) -> list[ItemConVariantes]:
     """Genera variantes para varios ítems de la prueba, en paralelo.
 
@@ -396,6 +431,7 @@ def generar_variantes_prueba(
         cantidad: Cuántas versiones nuevas crear por ítem.
         dificultad: Ajuste de dificultad pedido por el docente.
         items_elegidos: Números de ítem a reformular. Si es None, se usan todos.
+        al_avanzar: Se invoca con (completados, total) al terminar cada ítem.
     """
     seleccion = prueba.items
     if items_elegidos:
@@ -404,12 +440,10 @@ def generar_variantes_prueba(
     if not seleccion:
         return []
 
-    with ThreadPoolExecutor(max_workers=MAX_HILOS) as ejecutor:
-        return list(
-            ejecutor.map(
-                lambda item: generar_variantes(
-                    item, prueba.asignatura, prueba.nivel, cantidad, dificultad
-                ),
-                seleccion,
-            )
-        )
+    return _ejecutar_en_paralelo(
+        seleccion,
+        lambda item: generar_variantes(
+            item, prueba.asignatura, prueba.nivel, cantidad, dificultad
+        ),
+        al_avanzar,
+    )

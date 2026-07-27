@@ -1,6 +1,7 @@
 # Variables de entorno y credenciales
 .env
 *.key
+.streamlit/secrets.toml
 
 # Índice vectorial generado (se reconstruye automáticamente)
 indice_faiss/
