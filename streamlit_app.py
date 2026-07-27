@@ -52,7 +52,7 @@ from src.estilos import CSS, MASTHEAD  # noqa: E402
 from src.exportar import exportar_pdf  # noqa: E402
 from src.extraccion import ArchivoNoSoportado, extraer_de_varios  # noqa: E402
 from src.modelos import Correccion, Item, ItemConVariantes, Prueba  # noqa: E402
-from src.presentacion import ETIQUETAS_ERROR, calcular_nota  # noqa: E402
+from src.presentacion import ETIQUETAS_ERROR  # noqa: E402
 
 TIPOS = ["pdf", "png", "jpg", "jpeg", "webp"]
 
@@ -85,11 +85,6 @@ st.markdown(CSS, unsafe_allow_html=True)
 # --------------------------------------------------------------------------- #
 # Utilidades de pantalla
 # --------------------------------------------------------------------------- #
-
-
-def numero(valor: float) -> str:
-    """Formatea un número sin decimales innecesarios."""
-    return f"{valor:g}"
 
 
 def guardar_temporales(archivos) -> list[Path]:
@@ -209,41 +204,37 @@ def leer_prueba(rutas: list[Path], cronometro: Cronometro) -> Prueba:
 
 
 def vista_resumen(prueba: Prueba, correcciones: list[Correccion]) -> None:
-    """Encabezado de la corrección, con puntaje y nota estimada."""
-    obtenido = sum(c.puntaje_obtenido for c in correcciones)
-    total = sum(c.puntaje_total for c in correcciones)
+    """Encabezado de la corrección, con el recuento de aciertos y errores."""
     aciertos = sum(1 for c in correcciones if c.es_correcta)
-    logro = (obtenido / total * 100) if total else 0.0
+    errores = len(correcciones) - aciertos
+    logro = (aciertos / len(correcciones) * 100) if correcciones else 0.0
 
     titulillo(prueba.titulo, f"{prueba.asignatura} · {prueba.nivel} · Corrección")
 
-    columnas = st.columns(4)
-    columnas[0].metric("Correctas", f"{aciertos} de {len(correcciones)}")
-    columnas[1].metric("Puntaje", f"{numero(obtenido)} / {numero(total)}")
+    columnas = st.columns(3)
+    columnas[0].metric("Correctas", str(aciertos))
+    columnas[1].metric("Con errores", str(errores))
     columnas[2].metric("Logro", f"{logro:.0f}%")
-    columnas[3].metric("Nota estimada", f"{calcular_nota(obtenido, total):.1f}")
 
     st.caption(
-        "La nota usa 60% de exigencia y es solo una referencia. La corrección "
-        "es una ayuda, no reemplaza la revisión de un docente."
+        "El agente identifica aciertos y errores y explica cómo se resuelve "
+        "cada ejercicio. La calificación le corresponde al docente."
     )
 
 
 def vista_resumen_resolucion(prueba: Prueba, correcciones: list[Correccion]) -> None:
     """Encabezado cuando la prueba venía en blanco y solo se resolvió."""
-    total = sum(c.puntaje_total for c in correcciones)
     pasos = sum(len(c.resolucion_propia) for c in correcciones)
 
     titulillo(prueba.titulo, f"{prueba.asignatura} · {prueba.nivel} · Resolución")
 
-    columnas = st.columns(3)
+    columnas = st.columns(2)
     columnas[0].metric("Ejercicios resueltos", str(len(correcciones)))
     columnas[1].metric("Pasos de desarrollo", str(pasos))
-    columnas[2].metric("Puntaje del documento", numero(total))
 
     st.caption(
         "La prueba venía sin responder, así que el agente la resolvió. Sube la "
-        "hoja con tus respuestas para recibir corrección y nota."
+        "hoja con tus respuestas para recibir retroalimentación sobre ellas."
     )
 
 
@@ -266,7 +257,7 @@ def vista_correccion(item: Item, correccion: Correccion) -> None:
         # que el contenido nunca debe pasar por HTML crudo.
         st.markdown(f"> {item.enunciado}")
 
-        datos = st.columns(3)
+        datos = st.columns(2)
         with datos[0]:
             st.markdown('<div class="dato">Tu respuesta</div>', unsafe_allow_html=True)
             st.markdown(f"**{correccion.respuesta_alumno}**")
@@ -275,12 +266,6 @@ def vista_correccion(item: Item, correccion: Correccion) -> None:
                 '<div class="dato">Respuesta correcta</div>', unsafe_allow_html=True
             )
             st.markdown(f"**{correccion.respuesta_correcta}**")
-        with datos[2]:
-            st.markdown('<div class="dato">Puntaje</div>', unsafe_allow_html=True)
-            st.markdown(
-                f"**{numero(correccion.puntaje_obtenido)} / "
-                f"{numero(correccion.puntaje_total)}**"
-            )
 
         if not bien and correccion.donde_se_equivoco:
             st.markdown(f"**Dónde se quebró:** {correccion.donde_se_equivoco}")
@@ -299,7 +284,7 @@ def vista_resolucion(item: Item, correccion: Correccion) -> None:
     """Tarjeta con la resolución de un ítem que nadie había respondido.
 
     Se omite todo lo que solo tiene sentido frente a una respuesta previa: el
-    veredicto, el puntaje obtenido y el diagnóstico del error.
+    veredicto y el diagnóstico del error.
     """
     with st.container(border=True):
         st.markdown(
@@ -310,14 +295,8 @@ def vista_resolucion(item: Item, correccion: Correccion) -> None:
 
         st.markdown(f"> {item.enunciado}")
 
-        datos = st.columns(2)
-        with datos[0]:
-            st.markdown('<div class="dato">Respuesta</div>', unsafe_allow_html=True)
-            st.markdown(f"**{correccion.respuesta_correcta}**")
-        with datos[1]:
-            st.markdown('<div class="dato">Puntaje del ítem</div>',
-                        unsafe_allow_html=True)
-            st.markdown(f"**{numero(correccion.puntaje_total)}**")
+        st.markdown('<div class="dato">Respuesta</div>', unsafe_allow_html=True)
+        st.markdown(f"**{correccion.respuesta_correcta}**")
 
         st.markdown("**Desarrollo:**")
         for posicion, paso in enumerate(correccion.resolucion_propia, start=1):
@@ -444,7 +423,7 @@ with pestana_alumno:
         elif not revisar:
             st.info(
                 "Aquí aparecerá el resultado. Si tu prueba viene respondida "
-                "verás el puntaje por ítem y el punto exacto donde se quebró el "
+                "verás qué acertaste y el punto exacto donde se quebró el "
                 "razonamiento; si viene en blanco, el desarrollo completo de "
                 "cada ejercicio.",
                 icon="📖",

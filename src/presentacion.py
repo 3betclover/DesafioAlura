@@ -7,13 +7,6 @@ componentes.
 
 from src.modelos import Correccion, ItemConVariantes, Prueba
 
-# Exigencia habitual del sistema escolar chileno: el 60% del puntaje
-# corresponde a la nota 4,0.
-EXIGENCIA = 0.6
-NOTA_MINIMA = 1.0
-NOTA_APROBACION = 4.0
-NOTA_MAXIMA = 7.0
-
 ETIQUETAS_ERROR = {
     "ninguno": "Correcto",
     "sin_responder": "Sin responder",
@@ -26,55 +19,26 @@ ETIQUETAS_ERROR = {
 }
 
 
-def calcular_nota(obtenido: float, total: float) -> float:
-    """Convierte un puntaje a la escala de notas de 1,0 a 7,0.
-
-    Usa una escala lineal de dos tramos con 60% de exigencia, que es la fórmula
-    estándar en los establecimientos chilenos.
-    """
-    if total <= 0:
-        return NOTA_MINIMA
-
-    corte = EXIGENCIA * total
-
-    if obtenido < corte:
-        nota = NOTA_MINIMA + (NOTA_APROBACION - NOTA_MINIMA) * (obtenido / corte)
-    else:
-        restante = total - corte
-        avance = (obtenido - corte) / restante if restante else 1.0
-        nota = NOTA_APROBACION + (NOTA_MAXIMA - NOTA_APROBACION) * avance
-
-    return round(min(max(nota, NOTA_MINIMA), NOTA_MAXIMA), 1)
-
-
-def _numero(valor: float) -> str:
-    """Formatea un número sin decimales innecesarios."""
-    return f"{valor:g}"
-
-
 def formato_correcciones(prueba: Prueba, correcciones: list[Correccion]) -> str:
     """Arma el informe de retroalimentación para el estudiante."""
     if not correcciones:
         return "No se detectaron ítems en el documento."
 
-    obtenido = sum(c.puntaje_obtenido for c in correcciones)
-    total = sum(c.puntaje_total for c in correcciones)
     aciertos = sum(1 for c in correcciones if c.es_correcta)
-    porcentaje = (obtenido / total * 100) if total else 0.0
-    nota = calcular_nota(obtenido, total)
+    porcentaje = (aciertos / len(correcciones) * 100) if correcciones else 0.0
 
     lineas = [
         f"# {prueba.titulo}",
         f"**{prueba.asignatura}** · {prueba.nivel}",
         "",
-        "| Correctas | Puntaje | Logro | Nota estimada |",
-        "|---|---|---|---|",
-        f"| {aciertos} de {len(correcciones)} "
-        f"| {_numero(obtenido)} / {_numero(total)} "
-        f"| {porcentaje:.0f}% "
-        f"| **{nota:.1f}** |",
+        "| Correctas | Con errores | Logro |",
+        "|---|---|---|",
+        f"| {aciertos} "
+        f"| {len(correcciones) - aciertos} "
+        f"| {porcentaje:.0f}% de los ítems |",
         "",
-        "> La nota se calcula con 60% de exigencia y es solo una referencia.",
+        "> El agente identifica aciertos y errores. La calificación le "
+        "corresponde al docente.",
         "",
         "---",
         "",
@@ -93,10 +57,6 @@ def formato_correcciones(prueba: Prueba, correcciones: list[Correccion]) -> str:
         )
         lineas.append(
             f"- **Respuesta correcta:** {correccion.respuesta_correcta}"
-        )
-        lineas.append(
-            f"- **Puntaje:** {_numero(correccion.puntaje_obtenido)} / "
-            f"{_numero(correccion.puntaje_total)}"
         )
         lineas.append("")
 

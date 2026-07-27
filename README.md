@@ -45,8 +45,11 @@ el desarrollo completo, paso a paso, con la respuesta final de cada ejercicio.
   razonamiento.
 - Clasifica el tipo de error: de cálculo, de concepto, de signo, de
   procedimiento.
-- Asigna puntaje con crédito parcial y estima una nota en escala chilena de
-  1,0 a 7,0 con 60% de exigencia.
+
+El agente **no asigna puntajes ni notas**. Identifica aciertos y errores, y
+explica cómo se resuelve cada ejercicio. Calificar es una decisión pedagógica
+que le corresponde al docente, que conoce el contexto del curso y de cada
+estudiante.
 
 ### Modo docente
 
@@ -76,7 +79,7 @@ flowchart TD
     G --> H{Modo}
     H -->|Estudiante| I[Etapa 2 · Correccion<br/>una llamada por item, en paralelo]
     H -->|Docente| J[Etapa 3 · Generacion de variantes<br/>una llamada por item, en paralelo]
-    I --> K[Informe con retroalimentacion y nota]
+    I --> K[Informe con retroalimentacion por item]
     J --> L[Vista previa + PDF con formas y pauta]
 ```
 
@@ -173,7 +176,7 @@ Todas las salidas de esta sección son reales, producidas por el agente con
 Salida obtenida al procesar una versión de esa misma evaluación con las
 respuestas manuscritas de un estudiante.
 
-Resultado global: **4 correctas de 8**, 9,5 de 16 puntos, nota estimada **4,0**.
+Resultado global: **4 correctas de 8 ítems**.
 
 Ejemplo de retroalimentación de un ítem:
 
@@ -184,7 +187,7 @@ Ejemplo de retroalimentación de un ítem:
 
 Respuesta del agente:
 
-> ❌ **Ítem 4 · Error de concepto** · 0,5 / 2 puntos
+> ❌ **Ítem 4 · Error de concepto**
 >
 > **Tu respuesta:** 84 cm² · **Respuesta correcta:** 42 cm²
 >
@@ -206,8 +209,9 @@ Respuesta del agente:
 > 💡 *Recuerda incluir siempre la división por 2 al calcular el área de
 > cualquier triángulo.*
 
-Nótese el crédito parcial: el estudiante recibe 0,5 de 2 puntos porque la
-aritmética estaba bien y el error fue de fórmula, no de cálculo.
+Nótese la precisión del diagnóstico: no dice solo que el resultado está mal,
+sino que reconoce que la multiplicación estaba bien hecha y que lo que falló
+fue la elección de la fórmula.
 
 Los demás errores que detecta en el mismo archivo:
 
@@ -342,7 +346,7 @@ bajando el total a unos 30 segundos.
 │   ├── extraccion.py               PDF e imágenes a páginas procesables
 │   ├── agente.py                   Transcripción, corrección y variantes
 │   ├── exportar.py                 Generación del PDF con las formas y la pauta
-│   ├── presentacion.py             Cálculo de nota y salida en Markdown
+│   ├── presentacion.py             Resultados del agente en Markdown
 │   └── estilos.py                  Hoja de estilos de la interfaz
 ├── scripts/
 │   └── generar_prueba_ejemplo.py   Crea la prueba de demostración
@@ -402,8 +406,8 @@ Streamlit instala `requirements.txt` y levanta la aplicación. Cada `git push` a
 
 ## Limitaciones conocidas
 
-- La corrección y la nota son una ayuda, no reemplazan la revisión de un
-  docente. Conviene revisar los casos con crédito parcial.
+- La corrección es una ayuda, no reemplaza la revisión de un docente. El
+  agente identifica aciertos y errores, pero no califica.
 - La calidad de la transcripción depende de la nitidez de la fotografía. Letra
   muy pequeña o imágenes desenfocadas producen errores de lectura.
 - Se procesan hasta 8 páginas por documento, límite configurable mediante la

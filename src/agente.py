@@ -287,12 +287,7 @@ Sobre la retroalimentación:
   ejercicio, no solo para este.
 - Sé directo pero respetuoso. Nunca ridiculices al estudiante.
 - Si el ítem quedó sin responder, explica igualmente cómo se resuelve.
-
-Sobre el puntaje:
-- Otorga crédito parcial cuando el procedimiento es correcto y el error es
-  puramente aritmético.
-- Si no hay desarrollo visible y la respuesta es incorrecta, el puntaje es 0.
-- Usa <<puntaje>> como puntaje total del ítem.
+- No asignes puntajes ni notas: la evaluación le corresponde al docente.
 """
 
 
@@ -320,7 +315,6 @@ def corregir_item(item: Item, asignatura: str, nivel: str) -> Correccion:
         INSTRUCCION_CORRECCION,
         asignatura=asignatura,
         nivel=nivel,
-        puntaje=item.puntaje if item.puntaje else 1.0,
     )
 
     modelo = _crear_modelo(MODELO_RAZONAMIENTO, Correccion)

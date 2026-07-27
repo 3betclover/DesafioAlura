@@ -49,9 +49,6 @@ class Item(BaseModel):
             "incluyendo los errores. Null si no hay desarrollo visible."
         ),
     )
-    puntaje: Optional[float] = Field(
-        default=None, description="Puntaje asignado al ítem, si la prueba lo indica."
-    )
 
 
 class Prueba(BaseModel):
@@ -117,10 +114,6 @@ class Correccion(BaseModel):
     consejo: str = Field(
         description="Recomendación concreta para no repetir el error. Una oración."
     )
-    puntaje_obtenido: float = Field(
-        description="Puntaje logrado, considerando crédito parcial por el desarrollo."
-    )
-    puntaje_total: float = Field(description="Puntaje máximo del ítem.")
 
 
 class Variante(BaseModel):
