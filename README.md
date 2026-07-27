@@ -28,8 +28,8 @@ Proyecto desarrollado para el **Challenge Alura Agente**.
 En un colegio, dos tareas consumen una cantidad desproporcionada de tiempo:
 
 1. **Corregir.** Un docente con cuatro cursos revisa más de 120 pruebas por
-   unidad. La retroalimentación real —explicarle a cada estudiante *dónde* se
-   equivocó— es lo primero que se sacrifica por falta de horas. El estudiante
+   unidad. La retroalimentación real explicarle a cada estudiante *dónde* se
+   equivocó es lo primero que se sacrifica por falta de horas. El estudiante
    recibe una nota y una cruz roja, que no le enseñan nada.
 
 2. **Crear evaluaciones distintas.** Para que estudiantes sentados juntos no se
