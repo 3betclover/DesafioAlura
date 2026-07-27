@@ -132,16 +132,22 @@ def titulillo(titulo: str, credito: str) -> None:
     )
 
 
-def bloque_ejemplo(nombre: str, etiqueta: str) -> None:
-    """Ofrece la descarga de una prueba de ejemplo, si está en el repositorio."""
+def bloque_ejemplo(nombre: str, clave: str) -> None:
+    """Ofrece la descarga de la prueba de ejemplo, si está en el repositorio.
+
+    La clave es obligatoria: las dos pestañas ofrecen el mismo archivo con la
+    misma etiqueta, y sin distinguirlos Streamlit calcula el mismo identificador
+    de elemento para ambos botones y aborta.
+    """
     ruta = EJEMPLOS / nombre
     if ruta.exists():
         st.download_button(
-            etiqueta,
+            "Descargar prueba de ejemplo",
             data=ruta.read_bytes(),
             file_name=nombre,
             mime="application/pdf",
             use_container_width=True,
+            key=f"ejemplo_{clave}",
         )
 
 
@@ -375,7 +381,7 @@ with pestana_alumno:
             disabled=archivo_alumno is None,
         )
         st.caption("¿No tienes una a mano?")
-        bloque_ejemplo("prueba_matematica.pdf", "Descargar prueba de ejemplo")
+        bloque_ejemplo("prueba_matematica.pdf", "alumno")
 
     with columna_salida:
         if revisar and archivo_alumno is not None:
@@ -462,7 +468,7 @@ with pestana_docente:
             disabled=archivo_docente is None,
         )
         st.caption("¿No tienes una a mano?")
-        bloque_ejemplo("prueba_matematica.pdf", "Descargar prueba de ejemplo")
+        bloque_ejemplo("prueba_matematica.pdf", "docente")
 
     with columna_salida:
         if generar and archivo_docente is not None:
