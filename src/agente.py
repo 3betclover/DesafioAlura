@@ -17,13 +17,13 @@ from concurrent.futures import ThreadPoolExecutor
 from typing import Optional
 
 from langchain_core.messages import HumanMessage, SystemMessage
-from langchain_openai import ChatOpenAI
 
 from src.config import (
     MAX_HILOS,
     MODELO_RAZONAMIENTO,
     MODELO_VISION,
-    OPENAI_API_KEY,
+    PROVEEDOR,
+    clave_activa,
     hay_credenciales,
 )
 from src.extraccion import Pagina
@@ -31,25 +31,58 @@ from src.modelos import Correccion, Item, ItemConVariantes, Prueba
 
 
 class FaltaClaveAPI(Exception):
-    """No hay una clave de OpenAI configurada en el entorno."""
+    """No hay una clave de API configurada en el entorno."""
 
 
 def _crear_modelo(nombre: str, esquema, temperatura: float = 0.0):
-    """Devuelve un modelo de chat que responde según el esquema Pydantic dado."""
+    """Devuelve un modelo de chat que responde según el esquema Pydantic dado.
+
+    La elección del proveedor se resuelve en `config`, de modo que el resto del
+    módulo no necesita saber con cuál se está trabajando.
+    """
     if not hay_credenciales():
+        variable = "GOOGLE_API_KEY" if PROVEEDOR == "google" else "OPENAI_API_KEY"
         raise FaltaClaveAPI(
-            "Falta la variable OPENAI_API_KEY. Defínela en el archivo .env "
-            "en local, o como Secret del Space en Hugging Face."
+            f"Falta la variable {variable}. Defínela en el archivo .env en "
+            "local, o como Secret del Space en Hugging Face."
         )
 
-    modelo = ChatOpenAI(
-        model=nombre,
-        temperature=temperatura,
-        api_key=OPENAI_API_KEY,
-        timeout=120,
-        max_retries=2,
-    )
+    if PROVEEDOR == "google":
+        from langchain_google_genai import ChatGoogleGenerativeAI
+
+        modelo = ChatGoogleGenerativeAI(
+            model=nombre,
+            temperature=temperatura,
+            google_api_key=clave_activa(),
+            timeout=120,
+            max_retries=2,
+        )
+    else:
+        from langchain_openai import ChatOpenAI
+
+        modelo = ChatOpenAI(
+            model=nombre,
+            temperature=temperatura,
+            api_key=clave_activa(),
+            timeout=120,
+            max_retries=2,
+        )
+
     return modelo.with_structured_output(esquema)
+
+
+def _bloque_imagen(imagen_b64: str) -> dict:
+    """Construye el bloque de imagen en el formato estándar de LangChain.
+
+    Desde LangChain 1.0 existe un formato único de bloques de contenido que
+    cada integración traduce al dialecto de su proveedor. Usarlo evita tener
+    que mantener una variante del mensaje por cada modelo soportado.
+    """
+    return {
+        "type": "image",
+        "base64": imagen_b64,
+        "mime_type": "image/jpeg",
+    }
 
 
 # --------------------------------------------------------------------------- #
@@ -98,15 +131,7 @@ def transcribir_prueba(paginas: list[Pagina]) -> Prueba:
     ]
 
     for pagina in paginas:
-        contenido.append(
-            {
-                "type": "image_url",
-                "image_url": {
-                    "url": f"data:image/jpeg;base64,{pagina.imagen_b64}",
-                    "detail": "high",
-                },
-            }
-        )
+        contenido.append(_bloque_imagen(pagina.imagen_b64))
         if pagina.tiene_texto_util:
             contenido.append(
                 {
