@@ -206,7 +206,7 @@ with gr.Blocks(title="Te educo a palos") as demo:
                             "Revisar mi prueba", variant="primary", size="lg"
                         )
 
-                        ejemplos_alumno = _ejemplos("prueba_matematica_resuelta.pdf")
+                        ejemplos_alumno = _ejemplos("prueba_matematica.pdf")
                         if ejemplos_alumno:
                             gr.Examples(
                                 examples=ejemplos_alumno,
@@ -251,7 +251,7 @@ with gr.Blocks(title="Te educo a palos") as demo:
                         )
                         descarga = gr.File(label="Prueba y pauta en PDF", visible=True)
 
-                        ejemplos_docente = _ejemplos("prueba_matematica_en_blanco.pdf")
+                        ejemplos_docente = _ejemplos("prueba_matematica.pdf")
                         if ejemplos_docente:
                             gr.Examples(
                                 examples=ejemplos_docente,

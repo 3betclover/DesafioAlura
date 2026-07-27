@@ -1,11 +1,12 @@
-"""Genera las pruebas de ejemplo que acompañan a la demo.
+"""Genera la prueba de ejemplo que acompaña a la demo.
 
-Produce dos archivos en la carpeta `ejemplos/`:
+Produce `ejemplos/prueba_matematica.pdf`, una evaluación de 1° medio **sin
+resolver**. Se entrega en blanco a propósito: el trabajo de resolver los
+ejercicios le corresponde al agente, no al documento.
 
-- `prueba_matematica_en_blanco.pdf`: sirve para probar el modo Profesor.
-- `prueba_matematica_resuelta.pdf`: incluye respuestas simuladas de un
-  estudiante, con una mezcla deliberada de aciertos y de errores frecuentes,
-  para probar el modo Alumno.
+El mismo archivo sirve para los dos modos de la aplicación. En el modo
+estudiante el agente lo resuelve paso a paso, y en el modo docente genera
+versiones equivalentes de cada ítem.
 
 Uso:
     python scripts/generar_prueba_ejemplo.py
@@ -31,29 +32,22 @@ from reportlab.platypus import (  # noqa: E402
 
 from src.exportar import FUENTE, FUENTE_NEGRITA  # noqa: E402
 
-# Cada ítem define su enunciado, sus alternativas y lo que "escribió" el
-# estudiante. Los errores están elegidos a propósito: son los que más aparecen
-# en pruebas reales de primero medio.
+# Ítems de la evaluación. Cubren álgebra, geometría y proporcionalidad, que es
+# el temario habitual de la primera unidad de 1° medio.
 ITEMS = [
     {
         "enunciado": "Resuelve la ecuación 2x + 5 = 17. Muestra tu desarrollo.",
         "alternativas": [],
-        "desarrollo": "2x = 17 - 5<br/>2x = 12<br/>x = 12 / 2",
-        "respuesta": "x = 6",
         "puntaje": 2,
     },
     {
         "enunciado": "¿Cuál es el valor de 3<super>4</super>?",
         "alternativas": ["A) 7", "B) 12", "C) 64", "D) 81"],
-        "desarrollo": "3 · 4 = 12",
-        "respuesta": "B",
         "puntaje": 1,
     },
     {
         "enunciado": "Resuelve la ecuación cuadrática x<super>2</super> − 5x + 6 = 0.",
         "alternativas": [],
-        "desarrollo": "(x - 2)(x - 3) = 0",
-        "respuesta": "x = 2 y x = 3",
         "puntaje": 3,
     },
     {
@@ -62,22 +56,16 @@ ITEMS = [
             "Calcula su área."
         ),
         "alternativas": [],
-        "desarrollo": "A = base · altura<br/>A = 12 · 7",
-        "respuesta": "84 cm²",
         "puntaje": 2,
     },
     {
         "enunciado": "¿Cuál es el resultado de 3/4 + 1/6?",
         "alternativas": ["A) 4/10", "B) 11/12", "C) 2/5", "D) 4/24"],
-        "desarrollo": "3 + 1 = 4 y 4 + 6 = 10",
-        "respuesta": "A",
         "puntaje": 1,
     },
     {
         "enunciado": "Calcula el 15% de 240.",
         "alternativas": [],
-        "desarrollo": "240 · 0,15",
-        "respuesta": "36",
         "puntaje": 2,
     },
     {
@@ -86,8 +74,6 @@ ITEMS = [
             "¿Cuánto mide su hipotenusa?"
         ),
         "alternativas": [],
-        "desarrollo": "h = 6 + 8",
-        "respuesta": "14 cm",
         "puntaje": 3,
     },
     {
@@ -96,8 +82,6 @@ ITEMS = [
             "(4x<super>2</super>y) / (2xy)."
         ),
         "alternativas": [],
-        "desarrollo": "4/2 = 2, x²/x = x, y/y = 1",
-        "respuesta": "2x",
         "puntaje": 2,
     },
 ]
@@ -149,23 +133,11 @@ def _estilos() -> dict:
             leading=14,
             leftIndent=1.1 * cm,
         ),
-        # Azul e inclinado para que se distinga del enunciado impreso, tal como
-        # se vería una respuesta escrita a mano sobre la hoja.
-        "manuscrito": ParagraphStyle(
-            "Manuscrito",
-            parent=base["Normal"],
-            fontName="Helvetica-Oblique",
-            fontSize=11,
-            leading=16,
-            leftIndent=1.1 * cm,
-            textColor=colors.HexColor("#1D4ED8"),
-            spaceBefore=3,
-        ),
     }
 
 
-def construir(ruta: Path, con_respuestas: bool) -> Path:
-    """Escribe una de las dos versiones de la prueba de ejemplo."""
+def construir(ruta: Path) -> Path:
+    """Escribe la prueba de ejemplo, sin resolver."""
     estilos = _estilos()
     elementos: list = []
 
@@ -173,12 +145,9 @@ def construir(ruta: Path, con_respuestas: bool) -> Path:
     elementos.append(
         Paragraph("1° medio · Unidad: Álgebra y geometría básica", estilos["subtitulo"])
     )
-
-    nombre = "Camila Rojas Fuentes" if con_respuestas else "_" * 34
-    curso = "1° medio B" if con_respuestas else "_" * 12
     elementos.append(
         Paragraph(
-            f"Nombre: {nombre}    Curso: {curso}    Puntaje total: 16 puntos",
+            f"Nombre: {'_' * 34}    Curso: {'_' * 12}    Puntaje total: 16 puntos",
             estilos["datos"],
         )
     )
@@ -196,16 +165,8 @@ def construir(ruta: Path, con_respuestas: bool) -> Path:
         for alternativa in item["alternativas"]:
             elementos.append(Paragraph(alternativa, estilos["alternativa"]))
 
-        if con_respuestas:
-            if item["desarrollo"]:
-                elementos.append(Paragraph(item["desarrollo"], estilos["manuscrito"]))
-            elementos.append(
-                Paragraph(
-                    f"Respuesta: {item['respuesta']}",
-                    estilos["manuscrito"],
-                )
-            )
-        elif not item["alternativas"]:
+        # Espacio en blanco para que el estudiante desarrolle a mano.
+        if not item["alternativas"]:
             elementos.append(Spacer(1, 2.1 * cm))
 
     documento = SimpleDocTemplate(
@@ -226,11 +187,8 @@ def main() -> None:
     destino = RAIZ / "ejemplos"
     destino.mkdir(exist_ok=True)
 
-    en_blanco = construir(destino / "prueba_matematica_en_blanco.pdf", False)
-    resuelta = construir(destino / "prueba_matematica_resuelta.pdf", True)
-
-    for archivo in (en_blanco, resuelta):
-        print(f"Generado: {archivo.relative_to(RAIZ)} ({archivo.stat().st_size:,} bytes)")
+    archivo = construir(destino / "prueba_matematica.pdf")
+    print(f"Generado: {archivo.relative_to(RAIZ)} ({archivo.stat().st_size:,} bytes)")
 
 
 if __name__ == "__main__":

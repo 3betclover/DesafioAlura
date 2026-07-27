@@ -48,7 +48,7 @@ from src.config import (  # noqa: E402
     hay_credenciales,
     nombre_proveedor,
 )
-from src.estilos import CSS, PORTADA  # noqa: E402
+from src.estilos import CSS, MASTHEAD  # noqa: E402
 from src.exportar import exportar_pdf  # noqa: E402
 from src.extraccion import ArchivoNoSoportado, extraer_paginas  # noqa: E402
 from src.modelos import Correccion, Item, ItemConVariantes, Prueba  # noqa: E402
@@ -115,10 +115,19 @@ def mostrar_error(error: Exception) -> None:
         )
 
 
-def panel(titulo: str, descripcion: str) -> None:
+def pliego(titulo: str, descripcion: str) -> None:
     """Encabezado de la columna de carga."""
     st.markdown(
-        f'<div class="panel"><h4>{titulo}</h4><p>{descripcion}</p></div>',
+        f'<div class="pliego"><h4>{titulo}</h4><p>{descripcion}</p></div>',
+        unsafe_allow_html=True,
+    )
+
+
+def titulillo(titulo: str, credito: str) -> None:
+    """Encabezado de sección, al modo de un titular de revista."""
+    st.markdown(
+        f'<div class="titulillo"><h3>{titulo}</h3>'
+        f'<div class="credito">{credito}</div></div>',
         unsafe_allow_html=True,
     )
 
@@ -186,14 +195,13 @@ def leer_prueba(ruta: Path, cronometro: Cronometro) -> Prueba:
 
 
 def vista_resumen(prueba: Prueba, correcciones: list[Correccion]) -> None:
-    """Encabezado con el puntaje total y la nota estimada."""
+    """Encabezado de la corrección, con puntaje y nota estimada."""
     obtenido = sum(c.puntaje_obtenido for c in correcciones)
     total = sum(c.puntaje_total for c in correcciones)
     aciertos = sum(1 for c in correcciones if c.es_correcta)
     logro = (obtenido / total * 100) if total else 0.0
 
-    st.markdown(f"### {prueba.titulo}")
-    st.caption(f"{prueba.asignatura} · {prueba.nivel}")
+    titulillo(prueba.titulo, f"{prueba.asignatura} · {prueba.nivel} · Corrección")
 
     columnas = st.columns(4)
     columnas[0].metric("Correctas", f"{aciertos} de {len(correcciones)}")
@@ -207,17 +215,35 @@ def vista_resumen(prueba: Prueba, correcciones: list[Correccion]) -> None:
     )
 
 
+def vista_resumen_resolucion(prueba: Prueba, correcciones: list[Correccion]) -> None:
+    """Encabezado cuando la prueba venía en blanco y solo se resolvió."""
+    total = sum(c.puntaje_total for c in correcciones)
+    pasos = sum(len(c.resolucion_propia) for c in correcciones)
+
+    titulillo(prueba.titulo, f"{prueba.asignatura} · {prueba.nivel} · Resolución")
+
+    columnas = st.columns(3)
+    columnas[0].metric("Ejercicios resueltos", str(len(correcciones)))
+    columnas[1].metric("Pasos de desarrollo", str(pasos))
+    columnas[2].metric("Puntaje del documento", numero(total))
+
+    st.caption(
+        "La prueba venía sin responder, así que el agente la resolvió. Sube la "
+        "hoja con tus respuestas para recibir corrección y nota."
+    )
+
+
 def vista_correccion(item: Item, correccion: Correccion) -> None:
-    """Tarjeta con la retroalimentación de un ítem."""
+    """Tarjeta con la retroalimentación de un ítem ya respondido."""
     bien = correccion.es_correcta
     marca = "bien" if bien else "mal"
-    icono = "✅" if bien else "❌"
+    icono = "✓" if bien else "✕"
     etiqueta = ETIQUETAS_ERROR.get(correccion.tipo_error, correccion.tipo_error)
 
     with st.container(border=True):
         st.markdown(
-            f'<span class="marca {marca}">{icono} {etiqueta}</span>'
-            f'&nbsp;&nbsp;<strong>Ítem {item.numero}</strong>',
+            f'<span class="folio">Ítem {item.numero}</span>'
+            f'&nbsp;&nbsp;<span class="marca {marca}">{icono} {etiqueta}</span>',
             unsafe_allow_html=True,
         )
 
@@ -255,10 +281,45 @@ def vista_correccion(item: Item, correccion: Correccion) -> None:
             st.info(correccion.consejo, icon="💡")
 
 
+def vista_resolucion(item: Item, correccion: Correccion) -> None:
+    """Tarjeta con la resolución de un ítem que nadie había respondido.
+
+    Se omite todo lo que solo tiene sentido frente a una respuesta previa: el
+    veredicto, el puntaje obtenido y el diagnóstico del error.
+    """
+    with st.container(border=True):
+        st.markdown(
+            f'<span class="folio">Ítem {item.numero}</span>'
+            f'&nbsp;&nbsp;<span class="marca neutra">Resuelto</span>',
+            unsafe_allow_html=True,
+        )
+
+        st.markdown(f"> {item.enunciado}")
+
+        datos = st.columns(2)
+        with datos[0]:
+            st.markdown('<div class="dato">Respuesta</div>', unsafe_allow_html=True)
+            st.markdown(f"**{correccion.respuesta_correcta}**")
+        with datos[1]:
+            st.markdown('<div class="dato">Puntaje del ítem</div>',
+                        unsafe_allow_html=True)
+            st.markdown(f"**{numero(correccion.puntaje_total)}**")
+
+        st.markdown("**Desarrollo:**")
+        for posicion, paso in enumerate(correccion.resolucion_propia, start=1):
+            st.markdown(f"**{posicion}.** {paso}")
+
+        if correccion.consejo:
+            st.info(correccion.consejo, icon="💡")
+
+
 def vista_variantes(resultado: ItemConVariantes) -> None:
     """Tarjeta con las versiones generadas a partir de un ítem."""
     with st.container(border=True):
-        st.markdown(f"**Ítem {resultado.numero_original}**")
+        st.markdown(
+            f'<span class="folio">Ítem {resultado.numero_original}</span>',
+            unsafe_allow_html=True,
+        )
         st.caption(f"Evalúa: {resultado.concepto}")
 
         # Las formas se listan una tras otra en lugar de usar pestañas
@@ -283,37 +344,38 @@ def vista_variantes(resultado: ItemConVariantes) -> None:
 # Pantalla
 # --------------------------------------------------------------------------- #
 
-st.markdown(PORTADA, unsafe_allow_html=True)
+st.markdown(MASTHEAD, unsafe_allow_html=True)
 
 if not hay_credenciales():
     st.error(AVISO_SIN_CLAVE)
 
-pestana_alumno, pestana_docente = st.tabs(["🎒 Soy estudiante", "👩‍🏫 Soy docente"])
+pestana_alumno, pestana_docente = st.tabs(["Soy estudiante", "Soy docente"])
 
 
 with pestana_alumno:
     columna_entrada, columna_salida = st.columns([1, 2], gap="large")
 
     with columna_entrada:
-        panel(
-            "Corregir mi prueba",
-            "Sube tu prueba ya respondida. Funciona con el PDF original o con "
-            "una fotografía de la hoja escrita a mano.",
+        pliego(
+            "Resolver o corregir",
+            "Sube tu prueba en PDF o como fotografía de la hoja. Si viene "
+            "respondida, el agente corrige y estima la nota. Si viene en "
+            "blanco, la resuelve paso a paso.",
         )
         archivo_alumno = st.file_uploader(
-            "Tu prueba resuelta",
+            "Tu prueba",
             type=TIPOS,
             key="archivo_alumno",
             label_visibility="collapsed",
         )
         revisar = st.button(
-            "Revisar mi prueba",
+            "Procesar mi prueba",
             type="primary",
             use_container_width=True,
             disabled=archivo_alumno is None,
         )
         st.caption("¿No tienes una a mano?")
-        bloque_ejemplo("prueba_matematica_resuelta.pdf", "Descargar prueba de ejemplo")
+        bloque_ejemplo("prueba_matematica.pdf", "Descargar prueba de ejemplo")
 
     with columna_salida:
         if revisar and archivo_alumno is not None:
@@ -329,11 +391,16 @@ with pestana_alumno:
                         "contenga los ejercicios y que la imagen se lea bien."
                     )
                 else:
-                    cronometro.etapa(f"Corrigiendo {len(prueba.items)} ítems", 0.3)
+                    verbo = "Corrigiendo" if prueba.esta_respondida else "Resolviendo"
+                    cronometro.etapa(f"{verbo} {len(prueba.items)} ítems", 0.3)
                     correcciones = corregir_prueba(
-                        prueba, al_avanzar=cronometro.por_item("Corregido el ítem", 0.3, 1.0)
+                        prueba,
+                        al_avanzar=cronometro.por_item("Listo el ítem", 0.3, 1.0),
                     )
-                    cronometro.terminar("Corrección lista")
+                    cronometro.terminar(
+                        "Corrección lista" if prueba.esta_respondida
+                        else "Resolución lista"
+                    )
                     st.session_state["correccion"] = (prueba, correcciones)
             except Exception as error:  # noqa: BLE001 - la vista no debe caerse
                 cronometro.terminar("Proceso interrumpido")
@@ -341,16 +408,27 @@ with pestana_alumno:
 
         if st.session_state.get("correccion"):
             prueba, correcciones = st.session_state["correccion"]
-            vista_resumen(prueba, correcciones)
-            st.write("")
-            for item, correccion in zip(prueba.items, correcciones):
-                vista_correccion(item, correccion)
+
+            # La misma corrección se presenta distinto según si había algo que
+            # corregir: con respuestas del estudiante hay veredicto y nota; sin
+            # ellas solo tiene sentido mostrar la resolución.
+            if prueba.esta_respondida:
+                vista_resumen(prueba, correcciones)
+                st.write("")
+                for item, correccion in zip(prueba.items, correcciones):
+                    vista_correccion(item, correccion)
+            else:
+                vista_resumen_resolucion(prueba, correcciones)
+                st.write("")
+                for item, correccion in zip(prueba.items, correcciones):
+                    vista_resolucion(item, correccion)
         elif not revisar:
             st.info(
-                "El resultado de la corrección aparecerá aquí: puntaje por ítem, "
-                "el punto exacto donde se quebró el razonamiento y el desarrollo "
-                "correcto paso a paso.",
-                icon="🎒",
+                "Aquí aparecerá el resultado. Si tu prueba viene respondida "
+                "verás el puntaje por ítem y el punto exacto donde se quebró el "
+                "razonamiento; si viene en blanco, el desarrollo completo de "
+                "cada ejercicio.",
+                icon="📖",
             )
 
 
@@ -358,7 +436,7 @@ with pestana_docente:
     columna_entrada, columna_salida = st.columns([1, 2], gap="large")
 
     with columna_entrada:
-        panel(
+        pliego(
             "Generar variantes",
             "Sube una prueba, en blanco o resuelta. El agente identifica qué "
             "evalúa cada ítem y crea ejercicios nuevos equivalentes.",
@@ -384,7 +462,7 @@ with pestana_docente:
             disabled=archivo_docente is None,
         )
         st.caption("¿No tienes una a mano?")
-        bloque_ejemplo("prueba_matematica_en_blanco.pdf", "Descargar prueba de ejemplo")
+        bloque_ejemplo("prueba_matematica.pdf", "Descargar prueba de ejemplo")
 
     with columna_salida:
         if generar and archivo_docente is not None:
@@ -434,10 +512,10 @@ with pestana_docente:
             prueba, resultados = st.session_state["variantes"]
             formas = max(len(r.variantes) for r in resultados)
 
-            st.markdown(f"### {prueba.titulo}")
-            st.caption(
+            titulillo(
+                prueba.titulo,
                 f"{prueba.asignatura} · {prueba.nivel} · "
-                f"{len(resultados)} ítems × {formas} formas"
+                f"{len(resultados)} ítems × {formas} formas",
             )
 
             if st.session_state.get("pdf"):
@@ -457,13 +535,13 @@ with pestana_docente:
                 "Las variantes aparecerán aquí, agrupadas por ítem, junto con un "
                 "PDF descargable que trae cada forma completa y su pauta de "
                 "corrección resuelta.",
-                icon="👩‍🏫",
+                icon="📐",
             )
 
 
 st.markdown(
     f"""
-    <div class="pie">
+    <div class="colofon">
         Lectura de documentos con PyMuPDF y pypdf · Agente construido con
         LangChain · {nombre_proveedor()} · Visión <code>{MODELO_VISION}</code> ·
         Razonamiento <code>{MODELO_RAZONAMIENTO}</code> · Límite de

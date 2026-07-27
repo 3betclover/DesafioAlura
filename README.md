@@ -31,16 +31,22 @@ lo lee una vez y resuelve las dos.
 
 ### Modo estudiante
 
-Sube su prueba ya respondida, incluso como foto del cuaderno. El agente:
+Sube su prueba en PDF o como foto del cuaderno. El agente detecta si el
+documento trae respuestas y actúa en consecuencia.
 
-- Transcribe cada ítem y la respuesta manuscrita, conservando los errores.
-- Resuelve el ejercicio por su cuenta, sin mirar lo que respondió.
+**Si la prueba viene en blanco, la resuelve.** Transcribe cada ítem y entrega
+el desarrollo completo, paso a paso, con la respuesta final de cada ejercicio.
+
+**Si la prueba viene respondida, la corrige.** Además de lo anterior:
+
+- Transcribe la respuesta manuscrita conservando los errores tal como están.
+- Resuelve el ejercicio por su cuenta, sin mirar lo que respondió el estudiante.
 - Compara ambos resultados y señala **el paso exacto** donde se quebró el
   razonamiento.
 - Clasifica el tipo de error: de cálculo, de concepto, de signo, de
   procedimiento.
-- Entrega el desarrollo correcto paso a paso y una nota estimada en escala
-  chilena de 1,0 a 7,0 con 60% de exigencia.
+- Asigna puntaje con crédito parcial y estima una nota en escala chilena de
+  1,0 a 7,0 con 60% de exigencia.
 
 ### Modo docente
 
@@ -150,16 +156,22 @@ cómodo para desarrollar en local y Streamlit es lo que se despliega en la nube.
 
 ## Ejemplos
 
-La carpeta [`ejemplos/`](ejemplos/) incluye dos pruebas de matemática de 1°
-medio para probar la aplicación sin necesidad de tener un documento propio.
+La carpeta [`ejemplos/`](ejemplos/) incluye `prueba_matematica.pdf`, una
+evaluación de 1° medio con 8 ítems, para probar la aplicación sin necesidad de
+tener un documento propio.
+
+**El archivo se entrega sin resolver a propósito.** Resolver los ejercicios es
+trabajo del agente, no del documento de ejemplo. El mismo archivo sirve para
+los dos modos: en el modo estudiante lo resuelve paso a paso, y en el modo
+docente genera versiones equivalentes de cada ítem.
 
 Todas las salidas de esta sección son reales, producidas por el agente con
-`gemini-3.6-flash` sobre esos archivos.
+`gemini-3.6-flash`.
 
-### Modo estudiante
+### Modo estudiante, corrigiendo una prueba respondida
 
-Archivo: `ejemplos/prueba_matematica_resuelta.pdf`, una prueba de 8 ítems con
-aciertos y con errores frecuentes deliberados.
+Salida obtenida al procesar una versión de esa misma evaluación con las
+respuestas manuscritas de un estudiante.
 
 Resultado global: **4 correctas de 8**, 9,5 de 16 puntos, nota estimada **4,0**.
 
@@ -208,7 +220,7 @@ Los demás errores que detecta en el mismo archivo:
 
 ### Modo docente
 
-Archivo: `ejemplos/prueba_matematica_en_blanco.pdf`, pidiendo 3 formas.
+Archivo: `ejemplos/prueba_matematica.pdf`, pidiendo 3 formas.
 
 A partir del ítem "Resuelve la ecuación $2x + 5 = 17$", el agente identifica el
 concepto y genera:
@@ -330,10 +342,12 @@ bajando el total a unos 30 segundos.
 │   ├── extraccion.py               PDF e imágenes a páginas procesables
 │   ├── agente.py                   Transcripción, corrección y variantes
 │   ├── exportar.py                 Generación del PDF con las formas y la pauta
-│   └── presentacion.py             Resultados a Markdown y cálculo de nota
+│   ├── presentacion.py             Cálculo de nota y salida en Markdown
+│   └── estilos.py                  Hoja de estilos de la interfaz
 ├── scripts/
-│   └── generar_prueba_ejemplo.py   Crea las pruebas de demostración
-├── ejemplos/                       Pruebas en PDF para probar la aplicación
+│   └── generar_prueba_ejemplo.py   Crea la prueba de demostración
+├── ejemplos/                       Prueba en PDF para probar la aplicación
+├── .streamlit/config.toml          Paleta y tipografía de la aplicación
 ├── requirements.txt
 └── .env.example
 ```
