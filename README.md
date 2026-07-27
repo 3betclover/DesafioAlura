@@ -6,7 +6,7 @@ según quién la sube.
 
 Proyecto desarrollado para el **Challenge Alura Agente**.
 
-**Aplicación en línea:** _(pendiente de desplegar)_
+**Aplicación en línea:** 
 
 ---
 
