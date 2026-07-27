@@ -28,15 +28,23 @@ CSS = """
 
 /* Tipografía --------------------------------------------------------------- */
 
+/* La tipografía se declara solo en la raíz y se deja heredar. Aplicarla
+   elemento por elemento pisaba la fuente de los íconos de Streamlit, que son
+   ligaduras: la palabra "upload" se dibuja como símbolo, y con una serifa
+   encima quedaba escrita tal cual sobre el botón. */
 html, body,
-[data-testid="stAppViewContainer"],
-[data-testid="stAppViewContainer"] p,
-[data-testid="stAppViewContainer"] li,
-[data-testid="stAppViewContainer"] label,
-[data-testid="stAppViewContainer"] div,
-[data-testid="stAppViewContainer"] span,
-[data-testid="stAppViewContainer"] button {
+[data-testid="stAppViewContainer"] {
     font-family: 'Lora', Georgia, 'Times New Roman', serif;
+}
+
+/* Restitución explícita para los íconos, por si algún ancestro los alcanza. */
+[data-testid="stIconMaterial"],
+.material-icons,
+.material-symbols-rounded,
+.material-symbols-outlined {
+    font-family: 'Material Symbols Rounded', 'Material Icons' !important;
+    font-weight: normal !important;
+    letter-spacing: normal !important;
 }
 
 [data-testid="stAppViewContainer"] h1,
@@ -161,17 +169,38 @@ code, pre, kbd, [data-testid="stCode"] * {
 .stButton > button,
 .stDownloadButton > button {
     border-radius: 2px;
-    font-family: 'Lora', Georgia, serif !important;
     font-weight: 600;
     letter-spacing: 0.03em;
     padding: 0.6rem 1rem;
     border: 1px solid var(--sello);
 }
 
+/* Zona de carga --------------------------------------------------------- */
+
 [data-testid="stFileUploaderDropzone"] {
     background: var(--papel-hondo);
-    border: 1px dashed var(--filete);
+    border: 1px dashed var(--sello);
     border-radius: 3px;
+    padding: 1.4rem 1.1rem;
+    transition: background 0.15s ease;
+}
+
+[data-testid="stFileUploaderDropzone"]:hover {
+    background: #EDE3CE;
+}
+
+/* El botón de la zona de carga es secundario frente al de acción: se deja
+   discreto para que la mirada vaya primero al área donde se suelta el archivo. */
+[data-testid="stFileUploaderDropzone"] button {
+    border: 1px solid var(--filete);
+    background: transparent;
+    color: var(--sello);
+    font-size: 0.85rem;
+    padding: 0.4rem 0.9rem;
+}
+
+[data-testid="stFileUploaderDropzoneInstructions"] {
+    color: var(--tinta-suave);
 }
 
 /* Tarjetas de resultado ---------------------------------------------------- */

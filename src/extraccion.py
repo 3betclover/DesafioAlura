@@ -129,3 +129,34 @@ def extraer_paginas(ruta: str | Path) -> list[Pagina]:
         return _paginas_de_imagen(ruta)
 
     raise ArchivoNoSoportado(f"No se pudo procesar el archivo: {ruta.name}")
+
+
+def extraer_de_varios(rutas: list[str | Path]) -> list[Pagina]:
+    """Une varios archivos en una sola secuencia de páginas.
+
+    Permite subir una prueba repartida en varios recortes o fotografías, una
+    por hoja, en lugar de exigir un único documento. Las páginas se renumeran
+    de corrido siguiendo el orden en que llegan los archivos, que es el orden
+    en que la persona los seleccionó.
+
+    Args:
+        rutas: Archivos a procesar, en el orden en que deben leerse.
+
+    Returns:
+        Las páginas de todos los archivos, limitadas por `MAX_PAGINAS`.
+    """
+    paginas: list[Pagina] = []
+
+    for ruta in rutas:
+        for pagina in extraer_paginas(ruta):
+            if len(paginas) >= MAX_PAGINAS:
+                return paginas
+            paginas.append(
+                Pagina(
+                    numero=len(paginas) + 1,
+                    imagen_b64=pagina.imagen_b64,
+                    texto=pagina.texto,
+                )
+            )
+
+    return paginas

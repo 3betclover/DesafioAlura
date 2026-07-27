@@ -50,7 +50,7 @@ from src.config import (  # noqa: E402
 )
 from src.estilos import CSS, MASTHEAD  # noqa: E402
 from src.exportar import exportar_pdf  # noqa: E402
-from src.extraccion import ArchivoNoSoportado, extraer_paginas  # noqa: E402
+from src.extraccion import ArchivoNoSoportado, extraer_de_varios  # noqa: E402
 from src.modelos import Correccion, Item, ItemConVariantes, Prueba  # noqa: E402
 from src.presentacion import ETIQUETAS_ERROR, calcular_nota  # noqa: E402
 
@@ -92,11 +92,19 @@ def numero(valor: float) -> str:
     return f"{valor:g}"
 
 
-def guardar_temporal(archivo) -> Path:
-    """Deja el archivo subido en disco, que es lo que espera la extracción."""
-    destino = Path(tempfile.gettempdir()) / f"tep_{archivo.name}"
-    destino.write_bytes(archivo.getbuffer())
-    return destino
+def guardar_temporales(archivos) -> list[Path]:
+    """Deja en disco los archivos subidos, que es lo que espera la extracción."""
+    carpeta = Path(tempfile.gettempdir())
+    rutas = []
+
+    for posicion, archivo in enumerate(archivos):
+        # El índice evita que dos fotografías con el mismo nombre, algo común
+        # al subir recortes desde el teléfono, se pisen entre sí.
+        destino = carpeta / f"tep_{posicion}_{archivo.name}"
+        destino.write_bytes(archivo.getbuffer())
+        rutas.append(destino)
+
+    return rutas
 
 
 def mostrar_error(error: Exception) -> None:
@@ -186,10 +194,10 @@ class Cronometro:
         self.barra.progress(1.0, text=f"{texto} · {self.transcurrido} s en total")
 
 
-def leer_prueba(ruta: Path, cronometro: Cronometro) -> Prueba:
-    """Extrae las páginas del documento y las transcribe a ítems."""
-    cronometro.etapa("Leyendo el documento", 0.04)
-    paginas = extraer_paginas(ruta)
+def leer_prueba(rutas: list[Path], cronometro: Cronometro) -> Prueba:
+    """Extrae las páginas de los documentos y las transcribe a ítems."""
+    cronometro.etapa("Leyendo los archivos", 0.04)
+    paginas = extraer_de_varios(rutas)
 
     cronometro.etapa(f"Transcribiendo {len(paginas)} página(s)", 0.1)
     return transcribir_prueba(paginas)
@@ -364,31 +372,36 @@ with pestana_alumno:
     with columna_entrada:
         pliego(
             "Resolver o corregir",
-            "Sube tu prueba en PDF o como fotografía de la hoja. Si viene "
+            "Arrastra aquí tu prueba, en PDF o como fotografía. Si viene "
             "respondida, el agente corrige y estima la nota. Si viene en "
             "blanco, la resuelve paso a paso.",
         )
-        archivo_alumno = st.file_uploader(
+        archivos_alumno = st.file_uploader(
             "Tu prueba",
             type=TIPOS,
             key="archivo_alumno",
             label_visibility="collapsed",
+            accept_multiple_files=True,
+        )
+        st.caption(
+            "Puedes soltar varios archivos a la vez: una fotografía o un "
+            "recorte por hoja. Se procesan en el orden en que los subes."
         )
         revisar = st.button(
             "Procesar mi prueba",
             type="primary",
             use_container_width=True,
-            disabled=archivo_alumno is None,
+            disabled=not archivos_alumno,
         )
         st.caption("¿No tienes una a mano?")
         bloque_ejemplo("prueba_matematica.pdf", "alumno")
 
     with columna_salida:
-        if revisar and archivo_alumno is not None:
+        if revisar and archivos_alumno:
             st.session_state.pop("correccion", None)
             cronometro = Cronometro(st.empty())
             try:
-                prueba = leer_prueba(guardar_temporal(archivo_alumno), cronometro)
+                prueba = leer_prueba(guardar_temporales(archivos_alumno), cronometro)
 
                 if not prueba.items:
                     cronometro.terminar("Sin preguntas detectadas")
@@ -444,14 +457,20 @@ with pestana_docente:
     with columna_entrada:
         pliego(
             "Generar variantes",
-            "Sube una prueba, en blanco o resuelta. El agente identifica qué "
-            "evalúa cada ítem y crea ejercicios nuevos equivalentes.",
+            "Arrastra aquí una prueba, en blanco o resuelta. El agente "
+            "identifica qué evalúa cada ítem y crea ejercicios nuevos "
+            "equivalentes.",
         )
-        archivo_docente = st.file_uploader(
+        archivos_docente = st.file_uploader(
             "Prueba base",
             type=TIPOS,
             key="archivo_docente",
             label_visibility="collapsed",
+            accept_multiple_files=True,
+        )
+        st.caption(
+            "También acepta varios archivos: sirve para armar una prueba a "
+            "partir de recortes de evaluaciones distintas."
         )
         cantidad = st.slider(
             "Formas distintas a generar",
@@ -465,18 +484,18 @@ with pestana_docente:
             "Generar variantes",
             type="primary",
             use_container_width=True,
-            disabled=archivo_docente is None,
+            disabled=not archivos_docente,
         )
         st.caption("¿No tienes una a mano?")
         bloque_ejemplo("prueba_matematica.pdf", "docente")
 
     with columna_salida:
-        if generar and archivo_docente is not None:
+        if generar and archivos_docente:
             st.session_state.pop("variantes", None)
             st.session_state.pop("pdf", None)
             cronometro = Cronometro(st.empty())
             try:
-                prueba = leer_prueba(guardar_temporal(archivo_docente), cronometro)
+                prueba = leer_prueba(guardar_temporales(archivos_docente), cronometro)
 
                 if not prueba.items:
                     cronometro.terminar("Sin preguntas detectadas")
