@@ -1,4 +1,4 @@
-# 🪵 Te educo a palos
+#  Te educo a palos
 
 Agente de inteligencia artificial que lee una evaluación escolar, en PDF o como
 fotografía, separa sus preguntas y trabaja sobre ellas de dos maneras distintas
@@ -187,7 +187,7 @@ Ejemplo de retroalimentación de un ítem:
 
 Respuesta del agente:
 
-> ❌ **Ítem 4 · Error de concepto**
+> **Ítem 4 · Error de concepto**
 >
 > **Tu respuesta:** 84 cm² · **Respuesta correcta:** 42 cm²
 >
@@ -256,64 +256,12 @@ paso al final del documento.
 
 ## Cómo ejecutarlo
 
-### Requisitos
-
-- Python 3.10 o superior.
-- Una clave de API. La forma más rápida y sin costo es
-  [Google AI Studio](https://aistudio.google.com/apikey), que no pide tarjeta de
-  crédito.
-
-### Instalación
-
 ```bash
-git clone https://github.com/3betclover/DesafioAlura.git
-cd DesafioAlura
-
-python -m venv .venv
-source .venv/bin/activate        # En Windows: .venv\Scripts\activate
-
-pip install -r requirements.txt
+https://desafioaluragit-uqnunpdcmhb9waujtusprh.streamlit.app/
 ```
 
-### Configuración
 
-```bash
-cp .env.example .env
-```
 
-Edita `.env` y completa una de las dos claves:
-
-```ini
-GOOGLE_API_KEY=tu_clave_de_google
-# o bien
-OPENAI_API_KEY=tu_clave_de_openai
-```
-
-### Ejecución
-
-Con Streamlit, que es la interfaz que se despliega en la nube:
-
-```bash
-streamlit run streamlit_app.py
-```
-
-Queda disponible en `http://localhost:8501`.
-
-Con Gradio, alternativa para desarrollo local:
-
-```bash
-python app.py
-```
-
-Queda disponible en `http://127.0.0.1:7860`.
-
-### Regenerar las pruebas de ejemplo
-
-```bash
-python scripts/generar_prueba_ejemplo.py
-```
-
----
 
 ## Sobre los tiempos de respuesta
 
@@ -362,7 +310,7 @@ bajando el total a unos 30 segundos.
 
 La aplicación está desplegada en **Streamlit Community Cloud**, que ofrece
 alojamiento gratuito con URL pública permanente, se conecta directamente a este
-repositorio y no requiere tarjeta de crédito.
+repositorio.
 
 ### Por qué no Hugging Face ni OCI
 
