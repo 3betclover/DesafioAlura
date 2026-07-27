@@ -13,8 +13,8 @@ short_description: Agente de IA que corrige pruebas y genera variantes de ellas
 
 # 🪵 Te educo a palos
 
-Agente de inteligencia artificial que lee una evaluación escolar —en PDF o como
-fotografía— separa sus preguntas y trabaja sobre ellas de dos maneras distintas
+Agente de inteligencia artificial que lee una evaluación escolar, en PDF o como
+fotografía, separa sus preguntas y trabaja sobre ellas de dos maneras distintas
 según quién la sube.
 
 Proyecto desarrollado para el **Challenge Alura Agente**.
@@ -62,7 +62,7 @@ Sube una prueba, en blanco o resuelta. El agente:
 - Identifica qué habilidad evalúa cada ítem.
 - Genera N ejercicios nuevos equivalentes por ítem, con otros números, otros
   nombres y otro contexto, manteniendo la dificultad.
-- Arma varias **formas** completas de la evaluación (Forma A, B, C…), una por
+- Arma varias **formas** completas de la evaluación (Forma A, B, C), una por
   fila de la sala.
 - Exporta todo a un **PDF listo para imprimir**, con la pauta de corrección
   resuelta paso a paso al final.
@@ -123,6 +123,18 @@ Todas las respuestas del modelo se validan contra esquemas Pydantic mediante
 error del modelo falle de forma explícita en lugar de propagarse silenciosamente
 a la interfaz.
 
+**Los prompts usan marcadores propios, no `str.format`.**
+Los textos de instrucción contienen LaTeX, que ocupa tanto las llaves como el
+signo de dólar. Una expresión tan común como `$0{,}5$` rompe `str.format`. Se
+usan marcadores `<<nombre>>`, que no colisionan con la notación matemática.
+
+**Limitador de tasa compartido.**
+Como la corrección lanza una llamada por ítem en paralelo, una prueba de ocho
+preguntas dispara ocho peticiones casi simultáneas. El nivel gratuito de Google
+permite cinco por minuto, así que todas las instancias de modelo comparten un
+`InMemoryRateLimiter` y se reintenta ante error 429 respetando el `retryDelay`
+que informa el proveedor.
+
 ---
 
 ## Tecnologías
@@ -150,58 +162,84 @@ GPT. La variable `PROVEEDOR` permite forzar uno de los dos.
 La carpeta [`ejemplos/`](ejemplos/) incluye dos pruebas de matemática de 1°
 medio para probar la aplicación sin necesidad de tener un documento propio.
 
+Todas las salidas de esta sección son reales, producidas por el agente con
+`gemini-3.6-flash` sobre esos archivos.
+
 ### Modo estudiante
 
-Archivo: `ejemplos/prueba_matematica_resuelta.pdf`, que contiene una prueba con
+Archivo: `ejemplos/prueba_matematica_resuelta.pdf`, una prueba de 8 ítems con
 aciertos y con errores frecuentes deliberados.
+
+Resultado global: **4 correctas de 8**, 9,5 de 16 puntos, nota estimada **4,0**.
+
+Ejemplo de retroalimentación de un ítem:
 
 > **Ítem 4:** Un triángulo tiene una base de 12 cm y una altura de 7 cm.
 > Calcula su área.
-> **Respuesta del estudiante:** 84 cm²
+> **Lo que escribió el estudiante:** $A = base \cdot altura$, $A = 12 \cdot 7$,
+> respuesta 84 cm²
 
 Respuesta del agente:
 
-> ❌ **Ítem 4 · Error de procedimiento** — 0,5 / 2 puntos
+> ❌ **Ítem 4 · Error de concepto** · 0,5 / 2 puntos
 >
 > **Tu respuesta:** 84 cm² · **Respuesta correcta:** 42 cm²
 >
-> **Dónde se quebró:** en el primer paso escribiste $A = base \cdot altura$,
-> que es la fórmula del área del rectángulo, no la del triángulo.
+> **Dónde se quebró:** en el primer paso, al omitir la división por 2 en la
+> fórmula del área del triángulo y usar la del rectángulo.
 >
-> Multiplicaste bien 12 por 7, así que el cálculo aritmético está correcto. Lo
-> que falta es dividir por 2, porque un triángulo ocupa exactamente la mitad
-> del rectángulo que lo contiene.
+> Confundiste la fórmula del área del triángulo con la del rectángulo o
+> paralelogramo. Recuerda que un triángulo siempre corresponde a la mitad de un
+> paralelogramo de igual base y altura, por lo que es imprescindible dividir
+> por 2. Tu procedimiento multiplicó correctamente 12 por 7, pero la respuesta
+> final debía ser 42 cm².
 >
 > **Paso a paso:**
-> 1. Identificar la fórmula: $A = \frac{b \cdot h}{2}$
-> 2. Reemplazar: $A = \frac{12 \cdot 7}{2}$
-> 3. Calcular el numerador: $A = \frac{84}{2}$
-> 4. Dividir: $A = 42$ cm²
+> 1. Identificar la fórmula del área de un triángulo: A = (base × altura) / 2.
+> 2. Sustituir la base (12 cm) y la altura (7 cm) en la fórmula: A = (12 × 7) / 2.
+> 3. Calcular la multiplicación de la base por la altura: 12 × 7 = 84.
+> 4. Dividir el producto obtenido entre 2: 84 / 2 = 42 cm².
 >
-> 💡 *Cuando uses una fórmula de área, dibuja la figura y pregúntate si cabe
-> entera en un rectángulo o solo la mitad.*
+> 💡 *Recuerda incluir siempre la división por 2 al calcular el área de
+> cualquier triángulo.*
 
-Otras preguntas que resuelve sobre el mismo archivo:
+Nótese el crédito parcial: el estudiante recibe 0,5 de 2 puntos porque la
+aritmética estaba bien y el error fue de fórmula, no de cálculo.
 
-| Ítem | Error del estudiante | Lo que detecta el agente |
+Los demás errores que detecta en el mismo archivo:
+
+| Ítem | Respuesta del estudiante | Diagnóstico del agente |
 |---|---|---|
-| 2 | Responde 12 a "¿cuánto es $3^4$?" | Confundió potencia con multiplicación: calculó $3 \cdot 4$ en vez de $3 \cdot 3 \cdot 3 \cdot 3 = 81$ |
-| 5 | Responde 4/10 a $\frac{3}{4} + \frac{1}{6}$ | Sumó numeradores y denominadores por separado, sin buscar denominador común |
-| 7 | Responde 14 cm a la hipotenusa de catetos 6 y 8 | Sumó los catetos en lugar de aplicar Pitágoras: $\sqrt{6^2 + 8^2} = 10$ |
-| 1, 3, 6, 8 | Correctos | Los valida y entrega el desarrollo completo igualmente |
+| 2 | B (12) a "¿cuánto es $3^4$?" | Confundió potencia con multiplicación. La correcta es 81, opción D |
+| 5 | A (4/10) a $\frac{3}{4} + \frac{1}{6}$ | Sumó numeradores entre sí y denominadores entre sí. La correcta es 11/12, opción B |
+| 7 | 14 cm a la hipotenusa de catetos 6 y 8 | Sumó los catetos en lugar de aplicar Pitágoras. La correcta es 10 cm |
+| 1, 3, 6, 8 | Correctas | Las valida y entrega igualmente el desarrollo completo |
 
 ### Modo docente
 
-Archivo: `ejemplos/prueba_matematica_en_blanco.pdf`.
+Archivo: `ejemplos/prueba_matematica_en_blanco.pdf`, pidiendo 3 formas.
 
 A partir del ítem "Resuelve la ecuación $2x + 5 = 17$", el agente identifica el
-concepto —*resolución de ecuaciones lineales de primer grado*— y genera:
+concepto y genera:
 
 | Forma | Ejercicio generado | Respuesta |
 |---|---|---|
-| A | Resuelve la ecuación $4x - 7 = 21$ | $x = 7$ |
-| B | Resuelve la ecuación $3x + 8 = 29$ | $x = 7$ |
-| C | Resuelve la ecuación $6x - 5 = 31$ | $x = 6$ |
+| A | Resuelve la ecuación $3x - 4 = 14$ | $x = 6$ |
+| B | Resuelve la ecuación $4x + 7 = 27$ | $x = 5$ |
+| C | Resuelve la ecuación $5x - 8 = 27$ | $x = 7$ |
+
+A partir del ítem del área del triángulo, cambia además el contexto, no solo
+los números:
+
+| Forma | Ejercicio generado | Respuesta |
+|---|---|---|
+| A | Un triángulo tiene una base de 14 cm y una altura de 9 cm. Calcula su área | 63 cm² |
+| B | Una vela de adorno con forma triangular tiene una base de 8 cm y una altura de 15 cm. Calcula el área de la vela | 60 cm² |
+| C | Una señal de tránsito de forma triangular tiene una base de 16 cm y una altura de 11 cm. Calcula su área | 88 cm² |
+
+En los ítems de alternativas, los distractores reproducen errores típicos. Para
+"¿Cuál es el valor de $2^5$?" genera A) 7, B) 10, C) 25, D) 32: el 7 es la suma
+de base y exponente, el 10 su producto, y el 25 corresponde a invertirlos.
 
 El PDF descargable contiene las tres formas completas, cada una con su
 encabezado y espacio de desarrollo, más la pauta de corrección resuelta paso a
@@ -257,6 +295,25 @@ La aplicación queda disponible en `http://127.0.0.1:7860`.
 ```bash
 python scripts/generar_prueba_ejemplo.py
 ```
+
+---
+
+## Sobre los tiempos de respuesta
+
+Con el nivel gratuito de Google, corregir una prueba de 8 ítems toma alrededor
+de dos minutos: unos 20 segundos de transcripción más el tiempo que impone el
+límite de 5 peticiones por minuto sobre las 8 correcciones.
+
+No es una limitación del código sino de la cuota gratuita. Con una cuenta de
+pago basta subir la variable `RPM` y las llamadas se ejecutan en paralelo real,
+bajando el total a unos 30 segundos.
+
+| Variable | Efecto |
+|---|---|
+| `RPM` | Peticiones por minuto permitidas. 5 para Gemini gratuito, 10 en `gemini-2.5-flash-lite` |
+| `MAX_HILOS` | Llamadas concurrentes máximas |
+| `MAX_PAGINAS` | Páginas procesadas por documento, 8 por defecto |
+| `MAX_LADO_IMAGEN` | Resolución máxima enviada al modelo, en píxeles |
 
 ---
 
